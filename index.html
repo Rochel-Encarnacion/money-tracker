@@ -1,0 +1,571 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Pocket Ledger</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column. Raw Money leads, then savings and monthly spend, a quick-add form, and a month ledger. */
+:root {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --ink: #16201b;
+  --muted: #65706a;
+  --line: #e0e5e2;
+  --track: #e6ebe8;
+  --accent: #1c6a56;
+  --accent-ink: #ffffff;
+  --neg: #b0443a;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1412; --surface: #161c19; --ink: #e7ede9; --muted: #8e9993;
+    --line: #252d29; --track: #232b27; --accent: #5ec4a5; --accent-ink: #08160f; --neg: #e8847a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1412; --surface: #161c19; --ink: #e7ede9; --muted: #8e9993;
+  --line: #252d29; --track: #232b27; --accent: #5ec4a5; --accent-ink: #08160f; --neg: #e8847a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+.label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+/* top */
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+
+/* hero */
+.hero { display: flex; flex-direction: column; gap: 6px; }
+.big { font-size: clamp(2.5rem, 11vw, 3.5rem); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.big.neg { color: var(--neg); }
+.hint { margin: 0; color: var(--muted); }
+
+/* pair cards */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.card .val { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sub { margin: 0; font-size: 13px; color: var(--muted); }
+.track { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.goal-edit { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.goal-edit input { flex: 1 1 90px; min-width: 0; }
+
+/* form */
+form.add { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg span { display: block; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--bg); }
+.seg input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field > label { font-size: 12px; color: var(--muted); }
+input[type="text"], input[type="date"] {
+  width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); font-size: 16px;
+}
+.money { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding-left: 10px; }
+.money span { color: var(--muted); }
+.money input { border: 0; background: transparent; font-family: var(--font-num); }
+.money input:focus-visible { outline: none; }
+.money:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+#msg { margin: 0; font-size: 13px; color: var(--neg); min-height: 1.3em; flex: 1 1 140px; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 9px 18px; font-weight: 500; }
+.btn-s { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 6px 12px; font-size: 14px; }
+.btn-ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-size: 14px; }
+
+/* month */
+.month-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nav { display: flex; align-items: center; gap: 4px; }
+.nav button { background: none; border: 1px solid var(--line); border-radius: 8px; width: 34px; height: 34px; line-height: 1; font-size: 18px; }
+.nav button:disabled { opacity: 0.35; cursor: default; }
+.month-name { font-weight: 600; min-width: 8.5em; text-align: center; }
+.break { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.brow { display: grid; grid-template-columns: 8.5em 1fr auto; gap: 12px; align-items: center; }
+.brow .amt { text-align: right; font-size: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 6px; }
+.chips button { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); }
+.chips button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+
+.day { margin: 18px 0 4px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+ul.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.r-main { display: flex; flex-direction: column; min-width: 0; }
+.r-cat { font-weight: 500; }
+.r-note { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.r-amt { font-size: 14px; white-space: nowrap; }
+.r-amt.pos { color: var(--accent); }
+.x { background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.x:hover { color: var(--neg); }
+
+.empty { padding: 28px 0 8px; display: flex; flex-direction: column; gap: 10px; }
+.empty p { margin: 0; }
+.empty .row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; font-size: 13px; color: var(--muted); margin-top: 16px; }
+
+footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg);
+  padding: 9px 14px; border-radius: 8px; font-size: 14px; display: flex; gap: 12px; align-items: center;
+  max-width: calc(100vw - 32px); z-index: 20;
+}
+#toast button { background: none; border: 0; color: inherit; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+
+@media (max-width: 440px) {
+  .brow { grid-template-columns: 6.5em 1fr auto; gap: 8px; }
+  .month-name { min-width: 7em; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fill { transition: width 0.3s ease; }
+}
+</style>
+
+<main class="wrap">
+  <header class="top">
+    <h1>Pocket Ledger</h1>
+    <span class="label" id="today"></span>
+  </header>
+
+  <section class="hero" aria-labelledby="rawLabel">
+    <span class="label" id="rawLabel">Raw Money</span>
+    <div class="big" id="raw">₱0.00</div>
+    <p class="hint" id="rawHint"></p>
+  </section>
+
+  <section class="pair" id="pair"></section>
+
+  <form class="add" id="f" autocomplete="off" novalidate>
+    <fieldset>
+      <legend class="sr">Category</legend>
+      <div class="seg" id="cats">
+        <label><input type="radio" name="cat" value="allowance" checked><span>Allowance</span></label>
+        <label><input type="radio" name="cat" value="transport"><span>Transportation</span></label>
+        <label><input type="radio" name="cat" value="food"><span>Food</span></label>
+        <label><input type="radio" name="cat" value="other"><span>Other Expenses</span></label>
+        <label><input type="radio" name="cat" value="savings"><span>Savings</span></label>
+      </div>
+    </fieldset>
+    <fieldset id="dirset" hidden>
+      <legend class="sr">Savings direction</legend>
+      <div class="seg">
+        <label><input type="radio" name="dir" value="dep" checked><span>Move to savings</span></label>
+        <label><input type="radio" name="dir" value="wd"><span>Take from savings</span></label>
+      </div>
+    </fieldset>
+    <div class="fields">
+      <div class="field">
+        <label for="amt">Amount</label>
+        <div class="money"><span>₱</span><input id="amt" type="text" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div class="field">
+        <label for="date">Date</label>
+        <input id="date" type="date">
+      </div>
+      <div class="field wide">
+        <label for="note">Note (optional)</label>
+        <input id="note" type="text" maxlength="80" placeholder="e.g. Lunch at canteen">
+      </div>
+    </div>
+    <div class="actions">
+      <p id="msg" role="status" aria-live="polite"></p>
+      <button class="btn" type="submit">Add entry</button>
+    </div>
+  </form>
+
+  <section aria-label="Monthly ledger">
+    <div class="month-head">
+      <span class="label">Ledger</span>
+      <div class="nav">
+        <button type="button" data-act="prev" aria-label="Previous month">‹</button>
+        <span class="month-name" id="monthName"></span>
+        <button type="button" data-act="next" aria-label="Next month" id="nextBtn">›</button>
+      </div>
+    </div>
+    <div id="ledger"></div>
+  </section>
+
+  <footer>
+    <span id="sync"></span>
+    <button type="button" class="link" id="exportBtn" data-act="export" hidden>Export CSV</button>
+  </footer>
+</main>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  var CATS = {
+    allowance: { label: "Allowance", kind: "in" },
+    transport: { label: "Transportation", kind: "out" },
+    food: { label: "Food", kind: "out" },
+    other: { label: "Other Expenses", kind: "out" },
+    savings: { label: "Savings", kind: "save" }
+  };
+  var EXPENSES = ["transport", "food", "other"];
+  var LS = "pocket-ledger-v1";
+  var peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+
+  var state = { v: 1, u: 0, goal: 0, tx: [] };
+  var ui = { month: "", filter: "all", editingGoal: false };
+  var ref = null, downloads = null, saving = false, again = false, timer = null, seeded = false;
+  var lastDeleted = null, toastTimer = null;
+
+  /* ---------- helpers ---------- */
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function todayStr() { return ymd(new Date()); }
+  function parseDay(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function fmt(n) { return peso.format(n); }
+  function r2(n) { return Math.round(n * 100) / 100; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function monthLabel(m) { var p = m.split("-"); return new Date(+p[0], +p[1] - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); }
+  function parseAmt(s) { var n = parseFloat(String(s).replace(/[,\s₱]/g, "")); return isFinite(n) ? r2(n) : NaN; }
+  function $(id) { return document.getElementById(id); }
+
+  /* ---------- math ---------- */
+  function rawDelta(t) {
+    var k = CATS[t.c].kind;
+    if (k === "in") return t.a;
+    if (k === "out") return -t.a;
+    return t.dir === "wd" ? t.a : -t.a;
+  }
+  function rawMoney() { return r2(state.tx.reduce(function (s, t) { return s + rawDelta(t); }, 0)); }
+  function savingsBal() { return r2(state.tx.reduce(function (s, t) { return CATS[t.c].kind === "save" ? s + (t.dir === "wd" ? -t.a : t.a) : s; }, 0)); }
+  function inMonth(m) { return state.tx.filter(function (t) { return t.d.slice(0, 7) === m; }); }
+  function sumBy(list, pred) { return r2(list.reduce(function (s, t) { return pred(t) ? s + t.a : s; }, 0)); }
+
+  /* ---------- storage ---------- */
+  function loadLocal() { try { var r = localStorage.getItem(LS); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {} }
+  function setSync(mode) {
+    $("sync").textContent = mode === "cloud" ? "Saved to your account" : "Saved in this browser";
+  }
+  function touch() { state.u = Date.now(); saveLocal(); render(); queueSave(); }
+  function queueSave() {
+    if (!ref) { setSync("device"); return; }
+    clearTimeout(timer);
+    timer = setTimeout(flush, 400);
+  }
+  function flush() {
+    if (!ref) return;
+    if (saving) { again = true; return; }
+    saving = true; again = false;
+    ref.set(JSON.parse(JSON.stringify(state))).then(function () { setSync("cloud"); })
+      .catch(function () { setSync("device"); })
+      .then(function () { saving = false; if (again) flush(); });
+  }
+  function adopt(d) {
+    state = { v: 1, u: d.u || 0, goal: d.goal || 0, tx: d.tx };
+    saveLocal(); render();
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    var raw = rawMoney();
+    var rawEl = $("raw");
+    rawEl.textContent = (raw < 0 ? "−" : "") + fmt(Math.abs(raw));
+    rawEl.classList.toggle("neg", raw < 0);
+    $("rawHint").textContent = hintText(raw);
+    $("pair").innerHTML = savingsCard() + spentCard();
+    renderLedger();
+  }
+
+  function hintText(raw) {
+    if (!state.tx.length) return "Add your allowance to start. Raw Money is what you can still spend.";
+    if (raw < 0) return "You are over by " + fmt(-raw) + ".";
+    if (raw === 0) return "Nothing left to spend.";
+    var now = new Date();
+    var last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var left = last - now.getDate() + 1;
+    var end = new Date(now.getFullYear(), now.getMonth(), last).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return "About " + fmt(raw / left) + " a day through " + end + ".";
+  }
+
+  function savingsCard() {
+    var bal = savingsBal(), g = state.goal, body;
+    if (ui.editingGoal) {
+      body = '<form class="goal-edit" id="goalForm"><label class="sr" for="goalIn">Savings goal</label>' +
+        '<input type="text" id="goalIn" inputmode="decimal" placeholder="Goal amount" value="' + (g > 0 ? g : "") + '">' +
+        '<button class="btn-s" type="submit">Save</button>' +
+        '<button type="button" class="link" data-act="goal-cancel">Cancel</button></form>';
+    } else if (g > 0) {
+      var pct = Math.max(0, Math.min(100, bal / g * 100));
+      body = '<div class="track" role="img" aria-label="' + Math.floor(pct) + ' percent of goal"><div class="fill" style="width:' + pct + '%"></div></div>' +
+        '<p class="sub">' + Math.floor(pct) + '% of ' + fmt(g) + ' · <button class="link" data-act="goal-edit">Edit</button></p>';
+    } else {
+      body = '<p class="sub"><button class="link" data-act="goal-edit">Set a goal</button></p>';
+    }
+    return '<div class="card"><span class="label">Savings</span><span class="val">' + fmt(bal) + '</span>' + body + '</div>';
+  }
+
+  function spentCard() {
+    var m = todayStr().slice(0, 7), list = inMonth(m);
+    var spent = sumBy(list, function (t) { return CATS[t.c].kind === "out"; });
+    var inc = sumBy(list, function (t) { return CATS[t.c].kind === "in"; });
+    var name = new Date().toLocaleDateString("en-US", { month: "long" });
+    return '<div class="card"><span class="label">Spent in ' + name + '</span><span class="val">' + fmt(spent) + '</span>' +
+      '<p class="sub">Allowance received ' + fmt(inc) + '</p></div>';
+  }
+
+  function renderLedger() {
+    var m = ui.month, cur = todayStr().slice(0, 7);
+    $("monthName").textContent = monthLabel(m);
+    $("nextBtn").disabled = m >= cur;
+    var box = $("ledger");
+
+    if (!state.tx.length) {
+      box.innerHTML = '<div class="empty"><p>No entries yet.</p><p class="muted">Add your first allowance above, or look around with sample entries.</p>' +
+        '<div class="row-btns"><button type="button" class="btn-ghost" data-act="first">Add my allowance</button>' +
+        '<button type="button" class="btn-ghost" data-act="samples">Load sample entries</button></div></div>';
+      return;
+    }
+
+    var list = inMonth(m);
+    var total = sumBy(list, function (t) { return CATS[t.c].kind === "out"; });
+    var rows = EXPENSES.map(function (c) {
+      var v = sumBy(list, function (t) { return t.c === c; });
+      var pct = total > 0 ? v / total * 100 : 0;
+      return '<div class="brow"><span>' + CATS[c].label + '</span><div class="track"><div class="fill" style="width:' + pct + '%"></div></div><span class="amt num">' + fmt(v) + '</span></div>';
+    }).join("");
+    var inc = sumBy(list, function (t) { return CATS[t.c].kind === "in"; });
+    var saved = r2(list.reduce(function (s, t) { return CATS[t.c].kind === "save" ? s + (t.dir === "wd" ? -t.a : t.a) : s; }, 0));
+
+    var html = '';
+    if (state.tx.some(function (t) { return t.s; })) {
+      html += '<div class="banner"><span>Sample entries are showing.</span><button class="link" data-act="clear-samples">Clear samples</button></div>';
+    }
+    html += '<div class="break">' + rows + '</div>';
+    html += '<p class="meta"><span>Allowance ' + fmt(inc) + '</span><span>Saved ' + (saved < 0 ? "−" : "") + fmt(Math.abs(saved)) + '</span><span>Total spent ' + fmt(total) + '</span></p>';
+
+    var filters = [["all", "All"], ["allowance", "Allowance"], ["transport", "Transportation"], ["food", "Food"], ["other", "Other"], ["savings", "Savings"]];
+    html += '<div class="chips" role="group" aria-label="Filter entries">' + filters.map(function (f) {
+      return '<button type="button" data-filter="' + f[0] + '" aria-pressed="' + (ui.filter === f[0]) + '">' + f[1] + '</button>';
+    }).join("") + '</div>';
+
+    var shown = list.filter(function (t) { return ui.filter === "all" || t.c === ui.filter; })
+      .sort(function (a, b) { return a.d === b.d ? (b.t || 0) - (a.t || 0) : (a.d < b.d ? 1 : -1); });
+
+    if (!shown.length) {
+      html += '<p class="muted" style="margin:18px 0 0">Nothing here for ' + monthLabel(m) + '.</p>';
+    } else {
+      var lastDay = "", open = false;
+      shown.forEach(function (t) {
+        if (t.d !== lastDay) {
+          if (open) html += '</ul>';
+          html += '<h3 class="day">' + dayLabel(t.d) + '</h3><ul class="rows">';
+          lastDay = t.d; open = true;
+        }
+        html += rowHtml(t);
+      });
+      if (open) html += '</ul>';
+    }
+    box.innerHTML = html;
+  }
+
+  function dayLabel(s) {
+    var t = todayStr(), y = ymd(new Date(Date.now() - 864e5));
+    if (s === t) return "Today";
+    if (s === y) return "Yesterday";
+    return parseDay(s).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  function rowHtml(t) {
+    var d = rawDelta(t), sign = d >= 0 ? "+" : "−";
+    var label = CATS[t.c].label;
+    if (t.c === "savings") label += t.dir === "wd" ? " · Withdrawal" : " · Deposit";
+    return '<li class="row"><div class="r-main"><span class="r-cat">' + label + '</span>' +
+      (t.n ? '<span class="r-note">' + esc(t.n) + '</span>' : '') + '</div>' +
+      '<span class="r-amt num' + (d > 0 ? ' pos' : '') + '">' + sign + fmt(t.a) + '</span>' +
+      '<button class="x" data-del="' + esc(t.id) + '" aria-label="Delete entry">×</button></li>';
+  }
+
+  /* ---------- toast ---------- */
+  function toast(text, undo) {
+    var el = $("toast");
+    el.innerHTML = "";
+    var s = document.createElement("span"); s.textContent = text; el.appendChild(s);
+    if (undo) {
+      var b = document.createElement("button"); b.type = "button"; b.textContent = "Undo"; b.setAttribute("data-act", "undo"); el.appendChild(b);
+    }
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; lastDeleted = null; }, 5000);
+  }
+
+  /* ---------- actions ---------- */
+  function addEntry(e) {
+    e.preventDefault();
+    var f = $("f"), msg = $("msg");
+    var cat = f.elements.cat.value;
+    var dir = f.elements.dir.value;
+    var a = parseAmt($("amt").value);
+    var d = $("date").value || todayStr();
+    msg.textContent = "";
+    if (!(a > 0) || a >= 1e9) { msg.textContent = "Enter an amount greater than zero."; $("amt").focus(); return; }
+    if (cat === "savings" && dir === "wd" && a > savingsBal()) {
+      msg.textContent = "Your savings only hold " + fmt(savingsBal()) + "."; $("amt").focus(); return;
+    }
+    var t = { id: uid(), t: Date.now(), d: d, c: cat, a: a, n: $("note").value.trim() };
+    if (cat === "savings") t.dir = dir;
+    state.tx.push(t);
+    ui.month = d.slice(0, 7);
+    ui.filter = "all";
+    $("amt").value = ""; $("note").value = "";
+    touch();
+    toast("Added");
+    $("amt").focus();
+  }
+
+  function removeEntry(id) {
+    var i = state.tx.findIndex(function (t) { return t.id === id; });
+    if (i < 0) return;
+    lastDeleted = state.tx.splice(i, 1)[0];
+    touch();
+    toast("Entry deleted", true);
+  }
+
+  function shiftMonth(n) {
+    var p = ui.month.split("-");
+    var d = new Date(+p[0], +p[1] - 1 + n, 1);
+    var m = d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    if (m > todayStr().slice(0, 7)) return;
+    ui.month = m; renderLedger();
+  }
+
+  function loadSamples() {
+    var rows = [
+      [11, "allowance", 1500, "Weekly allowance"], [8, "food", 110, "Lunch and snacks"], [6, "transport", 120, "Jeep and tricycle"],
+      [5, "other", 180, "Printing and supplies"], [4, "allowance", 1500, "Weekly allowance"], [3, "savings", 300, "Emergency fund", "dep"],
+      [2, "food", 95, "Canteen"], [1, "transport", 60, "Jeep to campus"], [1, "food", 70, "Merienda"], [0, "food", 85, "Lunch"]
+    ];
+    var now = Date.now();
+    rows.forEach(function (r, i) {
+      var d = new Date(); d.setDate(d.getDate() - r[0]);
+      var t = { id: uid(), t: now + i, d: ymd(d), c: r[1], a: r[2], n: r[3], s: 1 };
+      if (r[4]) t.dir = r[4];
+      state.tx.push(t);
+    });
+    ui.month = todayStr().slice(0, 7);
+    touch();
+  }
+
+  function exportCsv() {
+    if (!downloads) return;
+    var q = function (s) { return '"' + String(s).replace(/"/g, '""') + '"'; };
+    var lines = ["Date,Category,Type,Amount,Note"];
+    state.tx.slice().sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : (a.t || 0) - (b.t || 0); }).forEach(function (t) {
+      var type = t.c === "savings" ? (t.dir === "wd" ? "Withdrawal" : "Deposit") : (CATS[t.c].kind === "in" ? "Income" : "Expense");
+      lines.push([t.d, q(CATS[t.c].label), type, t.a.toFixed(2), q(t.n || "")].join(","));
+    });
+    downloads.save({ filename: "pocket-ledger-" + todayStr() + ".csv", data: lines.join("\n") })
+      .catch(function (e) { if (e && e.code !== "declined") toast("The file could not be saved."); });
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-act],[data-del],[data-filter]");
+    if (!el) return;
+    if (el.hasAttribute("data-del")) { removeEntry(el.getAttribute("data-del")); return; }
+    if (el.hasAttribute("data-filter")) { ui.filter = el.getAttribute("data-filter"); renderLedger(); return; }
+    var act = el.getAttribute("data-act");
+    if (act === "prev") shiftMonth(-1);
+    else if (act === "next") shiftMonth(1);
+    else if (act === "goal-edit") { ui.editingGoal = true; render(); var g = $("goalIn"); if (g) g.focus(); }
+    else if (act === "goal-cancel") { ui.editingGoal = false; render(); }
+    else if (act === "first") { document.querySelector('input[name="cat"][value="allowance"]').checked = true; syncDir(); $("amt").focus(); }
+    else if (act === "samples") loadSamples();
+    else if (act === "clear-samples") { state.tx = state.tx.filter(function (t) { return !t.s; }); touch(); }
+    else if (act === "undo") { if (lastDeleted) { state.tx.push(lastDeleted); lastDeleted = null; touch(); $("toast").hidden = true; } }
+    else if (act === "export") exportCsv();
+  });
+
+  document.addEventListener("submit", function (e) {
+    if (e.target.id === "goalForm") {
+      e.preventDefault();
+      var v = $("goalIn").value.trim();
+      var n = v === "" ? 0 : parseAmt(v);
+      if (!(n >= 0)) return;
+      state.goal = n; ui.editingGoal = false; touch();
+    }
+  });
+
+  function syncDir() {
+    $("dirset").hidden = $("f").elements.cat.value !== "savings";
+  }
+  $("f").addEventListener("submit", addEntry);
+  $("cats").addEventListener("change", syncDir);
+
+  /* ---------- boot ---------- */
+  var now = new Date();
+  $("today").textContent = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  $("date").value = todayStr();
+  ui.month = todayStr().slice(0, 7);
+
+  var local = loadLocal();
+  if (local && Array.isArray(local.tx)) state = { v: 1, u: local.u || 0, goal: local.goal || 0, tx: local.tx };
+  setSync("device");
+  render();
+
+  function connect() {
+    var c = window.claude;
+    if (!c || !c.use) return;
+    Promise.all([c.use("db"), c.use("user"), c.use("downloads")]).then(function (r) {
+      var db = r[0], user = r[1];
+      downloads = r[2];
+      if (downloads) $("exportBtn").hidden = false;
+      if (!db || !user) return null;
+      return user.id().then(function (id) {
+        if (!id) return;
+        ref = db.doc("data/users/" + id + "/tracker");
+        ref.onSnapshot(function (snap) {
+          var d = snap.exists ? snap.data() : null;
+          if (!seeded) {
+            if (snap.metadata.fromCache) return;
+            seeded = true;
+            if (d && Array.isArray(d.tx) && (d.u || 0) >= state.u) adopt(d);
+            else if (state.tx.length || state.goal) queueSave();
+            setSync("cloud");
+            return;
+          }
+          if (snap.metadata.hasPendingWrites || saving) return;
+          if (d && Array.isArray(d.tx) && (d.u || 0) > state.u) adopt(d);
+        }, function () { ref = null; setSync("device"); });
+      });
+    }).catch(function () {});
+  }
+  connect();
+})();
+</script>
+
+</body></html>
